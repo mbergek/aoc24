@@ -35,31 +35,40 @@ def find_robot
   return nil
 end
 
-def move(pos, vec)
-  # Follow the direction until a space or wall is found
-  p = pos
-  while get(p) =~ /[@O]/
-    p += vec
+def move(pos, vec, count, mode = :move)
+
+  #puts "Move #{pos.to_s}, #{vec.to_s}, #{count}, #{mode}"
+
+  unless mode == :move
+    return count+1 if get(pos + vec) == '.'
+    return 0 if get(pos + vec) == '#'
+    return move(pos+vec, vec, count+1, :dry)
   end
 
-  # If a wall was found, then just return
-  return pos if get(p) == "#"
-
-  # If a space was found then move all boxes and the robot one position
-  while get(p) =~ /[O\.]/
-    set(p, get(p - vec))
-    p -= vec
-  end
-  set(p, '.')
-
-  # Return the new position of the robot
-  return pos + vec
+  move(pos+vec, vec, count-1, :move) if count > 1
+  set(pos+vec, get(pos))
+  set(pos, '.')
 end
 
 def offside(pos)
   return true if pos[1] < 0 || pos[1] >= $matrix.size
   return true if pos[0] < 0 || pos[0] >= $matrix[pos[1]].size
   return false
+end
+
+def widen(m)
+  nm = Array.new
+  (0...m.size).each do |y|
+    row = []
+    m[y].each do |v|
+      row += ['#', '#'] if v == '#'
+      row += ['[', ']'] if v == 'O'
+      row += ['.', '.'] if v == '.'
+      row += ['@', '.'] if v == '@'
+    end
+    nm << row
+  end
+  return nm
 end
 
 data = []
@@ -77,7 +86,7 @@ ARGF.each do |line|
   end
 end
 
-$matrix = data
+$matrix = Marshal.load( Marshal.dump(data))
 
 #pp $matrix
 #puts movements
@@ -97,8 +106,14 @@ movements.chars.each do |c|
     v = Vector[0, -1]
   end
 
-  position = move(position, v)
+  count = move(position, v, 0, :dry)
+  if count > 0
+    move(position, v, count, :move)
+    position = position + v
+  end
+
 end
 
 #pp $matrix
 puts get_score
+
